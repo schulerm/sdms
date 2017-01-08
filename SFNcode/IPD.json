@@ -1,0 +1,112 @@
+{
+  "Comment": "Create an Ingest, Transcode, and Distribute",
+    "StartAt": "identifyAssetClass",
+      "States": {
+          "identifyAssetClass": {
+        "Type": "Task",
+      "Resource": "arn:aws:states:us-east-1:497940546915:activity:identifyAssetClass",
+            "Next": "chooseMetadataExtractor"
+        },
+    "chooseMetadataExtractor": {
+          "Type" : "Choice",
+        "Choices": [
+        {
+          "Variable": "$.assetClass",
+            "StringEquals": "Image",
+              "Next": "extractExifMetadata"
+              }
+            ],
+          "Default": "extractMediaInfoMetadata"
+      },
+          "extractExifMetadata": {
+        "Type" : "Task",
+      "Resource": "arn:aws:states:us-east-1:497940546915:activity:extractExifMetadata",
+            "Next": "registerAsset"
+        },
+    "extractMediaInfoMetadata": {
+          "Type" : "Task",
+        "Resource": "arn:aws:states:us-east-1:497940546915:activity:extractMediaInfoMetadata",
+      "Next": "registerAsset"
+          },
+
+      "registerAsset": {
+            "Type": "Task",
+          "Resource": "arn:aws:states:us-east-1:497940546915:activity:registerAsset",
+        "Next": "chooseTranscodeOption"
+    },
+          
+        "chooseTranscodeOption": {
+      "Type" : "Choice",
+            "Choices": [
+            {
+              "Variable": "$.assetClass",
+                "StringEquals": "Image",
+          "Next": "createThumbnailFromImage"
+          },
+          {
+            "Variable": "$.assetClass",
+              "StringEquals": "Video",
+                "Next": "startVideoTasks"
+        },
+        {
+          "Variable": "$.assetClass",
+            "StringEquals": "Audio",
+              "Next": "transcodeAudio"
+              }
+            ],
+          "Default": "distributeToS3"
+      },
+
+           "createThumbnailFromImage": {
+         "Type": "Task",
+       "Resource": "arn:aws:states:us-east-1:497940546915:activity:createThumbnailFromImage",
+             "Next": "distributeToS3"
+         },
+      
+     "startVideoTasks" : {
+           "Type": "Parallel",
+         "Branches" : [
+         {
+           "StartAt" : "createThumbnailFromVideo",
+             "States" : {
+                         "createThumbnailFromVideo": {
+                       "Type": "Task",
+                             "Resource": "arn:aws:states:us-east-1:497940546915:activity:createThumbnailFromVideo",
+                           "End": true
+                       }
+                 }
+         },
+         {
+         "StartAt" : "transcodeVideo",
+           "States" : {
+                       "transcodeVideo": {
+                             "Type": "Task",
+                           "Resource": "arn:aws:states:us-east-1:497940546915:activity:transcodeVideo",
+                         "End": true
+                     }
+               }
+               }
+               ],
+             "Next" : "distributeToS3"
+             },
+         
+         "transcodeAudio": {
+       "Type": "Task",
+             "Resource": "arn:aws:states:us-east-1:497940546915:activity:transcodeAudio",
+           "Next": "cleanUpLandingPad"
+       },
+           
+           "distributeToS3": {
+         "Type": "Task",
+       "Resource": "arn:aws:states:us-east-1:497940546915:activity:distributeToS3",
+             "Next": "cleanUpLandingPad"
+         },
+     
+     "cleanUpLandingPad": {
+           "Type": "Task",
+         "Resource": "arn:aws:states:us-east-1:497940546915:activity:cleanUpLandingPad",
+       "End": true
+           }
+     }
+}
+
